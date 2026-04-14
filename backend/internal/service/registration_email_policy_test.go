@@ -29,3 +29,25 @@ func TestIsRegistrationEmailSuffixAllowed(t *testing.T) {
 	require.False(t, IsRegistrationEmailSuffixAllowed("user@sub.example.com", []string{"@example.com"}))
 	require.True(t, IsRegistrationEmailSuffixAllowed("user@any.com", []string{}))
 }
+
+func TestNormalizeRegistrationEmailSuffixWhitelist_Wildcard(t *testing.T) {
+	got, err := NormalizeRegistrationEmailSuffixWhitelist([]string{"@*.edu.cn", "*.Example.com"})
+	require.NoError(t, err)
+	require.Equal(t, []string{"@*.edu.cn", "@*.example.com"}, got)
+
+	_, err = NormalizeRegistrationEmailSuffixWhitelist([]string{"*.com"})
+	require.Error(t, err)
+
+	_, err = NormalizeRegistrationEmailSuffixWhitelist([]string{"foo.*.com"})
+	require.Error(t, err)
+}
+
+func TestIsRegistrationEmailSuffixAllowed_Wildcard(t *testing.T) {
+	wl := []string{"@*.edu.cn"}
+	require.True(t, IsRegistrationEmailSuffixAllowed("user@pku.edu.cn", wl))
+	require.True(t, IsRegistrationEmailSuffixAllowed("user@mail.pku.edu.cn", wl))
+	require.False(t, IsRegistrationEmailSuffixAllowed("user@edu.cn", wl))
+	require.False(t, IsRegistrationEmailSuffixAllowed("user@fakeedu.cn", wl))
+	require.False(t, IsRegistrationEmailSuffixAllowed("user@other.com", wl))
+	require.True(t, IsRegistrationEmailSuffixAllowed("user@edu.cn", []string{"@*.edu.cn", "@edu.cn"}))
+}

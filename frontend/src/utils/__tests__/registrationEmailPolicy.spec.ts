@@ -66,6 +66,21 @@ describe('registrationEmailPolicy utils', () => {
     expect(isRegistrationEmailSuffixDomainValid('localhost')).toBe(false)
   })
 
+  it('isRegistrationEmailSuffixDomainValid accepts *. wildcard prefix', () => {
+    expect(isRegistrationEmailSuffixDomainValid('*.edu.cn')).toBe(true)
+    expect(isRegistrationEmailSuffixDomainValid('*.example.com')).toBe(true)
+    expect(isRegistrationEmailSuffixDomainValid('*.com')).toBe(false)
+    expect(isRegistrationEmailSuffixDomainValid('*')).toBe(false)
+    expect(isRegistrationEmailSuffixDomainValid('foo.*.com')).toBe(false)
+  })
+
+  it('parseRegistrationEmailSuffixWhitelistInput preserves *. wildcard entries', () => {
+    expect(parseRegistrationEmailSuffixWhitelistInput('@*.edu.cn, *.example.com')).toEqual([
+      '*.edu.cn',
+      '*.example.com'
+    ])
+  })
+
   it('isRegistrationEmailSuffixAllowed allows any email when whitelist is empty', () => {
     expect(isRegistrationEmailSuffixAllowed('user@example.com', [])).toBe(true)
   })
@@ -73,5 +88,16 @@ describe('registrationEmailPolicy utils', () => {
   it('isRegistrationEmailSuffixAllowed applies exact suffix matching', () => {
     expect(isRegistrationEmailSuffixAllowed('user@example.com', ['@example.com'])).toBe(true)
     expect(isRegistrationEmailSuffixAllowed('user@sub.example.com', ['@example.com'])).toBe(false)
+  })
+
+  it('isRegistrationEmailSuffixAllowed applies *. wildcard as strict subdomain match', () => {
+    expect(isRegistrationEmailSuffixAllowed('user@pku.edu.cn', ['@*.edu.cn'])).toBe(true)
+    expect(isRegistrationEmailSuffixAllowed('user@mail.pku.edu.cn', ['@*.edu.cn'])).toBe(true)
+    expect(isRegistrationEmailSuffixAllowed('user@edu.cn', ['@*.edu.cn'])).toBe(false)
+    expect(isRegistrationEmailSuffixAllowed('user@fakeedu.cn', ['@*.edu.cn'])).toBe(false)
+    expect(isRegistrationEmailSuffixAllowed('user@other.com', ['@*.edu.cn'])).toBe(false)
+    expect(
+      isRegistrationEmailSuffixAllowed('user@edu.cn', ['@*.edu.cn', '@edu.cn'])
+    ).toBe(true)
   })
 })
