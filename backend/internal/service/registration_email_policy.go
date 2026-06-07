@@ -8,10 +8,8 @@ import (
 )
 
 var registrationEmailDomainPattern = regexp.MustCompile(
-	`^(?:\*\.)?[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$`,
+	`^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$`,
 )
-
-const registrationEmailSuffixWildcardPrefix = "@*."
 
 // RegistrationEmailSuffix extracts normalized suffix in "@domain" form.
 func RegistrationEmailSuffix(email string) string {
@@ -23,7 +21,7 @@ func RegistrationEmailSuffix(email string) string {
 }
 
 // IsRegistrationEmailSuffixAllowed checks whether an email is allowed by suffix whitelist.
-// Empty whitelist means allow all. Entries beginning with "@*." match any strict subdomain.
+// Empty whitelist means allow all.
 func IsRegistrationEmailSuffixAllowed(email string, whitelist []string) bool {
 	if len(whitelist) == 0 {
 		return true
@@ -34,14 +32,11 @@ func IsRegistrationEmailSuffixAllowed(email string, whitelist []string) bool {
 	}
 	suffix := "@" + domain
 	for _, allowed := range whitelist {
-		if strings.HasPrefix(allowed, registrationEmailSuffixWildcardPrefix) {
-			parent := strings.TrimPrefix(allowed, registrationEmailSuffixWildcardPrefix)
-			if domain != parent && strings.HasSuffix(domain, "."+parent) {
-				return true
-			}
-			continue
+		allowed = strings.ToLower(strings.TrimSpace(allowed))
+		if strings.HasPrefix(allowed, "@") && suffix == allowed {
+			return true
 		}
-		if suffix == allowed {
+		if strings.HasPrefix(allowed, "*.") && registrationEmailDomainMatchesWildcard(domain, allowed) {
 			return true
 		}
 	}
@@ -108,6 +103,14 @@ func normalizeRegistrationEmailSuffix(raw string) (string, error) {
 		return "", nil
 	}
 
+	if strings.HasPrefix(value, "*.") {
+		domain := strings.TrimPrefix(value, "*.")
+		if !isValidRegistrationEmailDomain(domain) {
+			return "", fmt.Errorf("invalid email suffix: %q", raw)
+		}
+		return "*." + domain, nil
+	}
+
 	domain := value
 	if strings.Contains(value, "@") {
 		if !strings.HasPrefix(value, "@") || strings.Count(value, "@") != 1 {
@@ -116,11 +119,25 @@ func normalizeRegistrationEmailSuffix(raw string) (string, error) {
 		domain = strings.TrimPrefix(value, "@")
 	}
 
-	if domain == "" || strings.Contains(domain, "@") || !registrationEmailDomainPattern.MatchString(domain) {
+	if !isValidRegistrationEmailDomain(domain) {
 		return "", fmt.Errorf("invalid email suffix: %q", raw)
 	}
 
 	return "@" + domain, nil
+}
+
+func isValidRegistrationEmailDomain(domain string) bool {
+	return domain != "" &&
+		!strings.Contains(domain, "@") &&
+		registrationEmailDomainPattern.MatchString(domain)
+}
+
+func registrationEmailDomainMatchesWildcard(domain string, allowed string) bool {
+	base := strings.TrimPrefix(allowed, "*.")
+	if !isValidRegistrationEmailDomain(base) {
+		return false
+	}
+	return domain == base || strings.HasSuffix(domain, "."+base)
 }
 
 func splitEmailForPolicy(raw string) (local string, domain string, ok bool) {
